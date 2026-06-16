@@ -69,18 +69,20 @@ public class Konusmaci {
             try (FileOutputStream o = new FileOutputStream(f)) { o.write(mp3); }
             final CountDownLatch latch = new CountDownLatch(1);
             MediaPlayer mp = new MediaPlayer();
+            // USAGE_MEDIA: muzik akisina gider, MIUI'de duyulur (USAGE_ASSISTANT bastiriliyordu)
             mp.setAudioAttributes(new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build());
             mp.setDataSource(f.getAbsolutePath());
-            mp.setOnCompletionListener(p -> latch.countDown());
-            mp.setOnErrorListener((p, w, e) -> { latch.countDown(); return true; });
+            mp.setOnCompletionListener(p -> { Gunluk.yaz(ctx, "      cal: tamamlandi"); latch.countDown(); });
+            mp.setOnErrorListener((p, w, e) -> { Gunluk.yaz(ctx, "      cal: HATA what=" + w + " extra=" + e); latch.countDown(); return true; });
             mp.prepare();
             mp.start();
+            Gunluk.yaz(ctx, "      cal: start (sure=" + mp.getDuration() + "ms)");
             latch.await(60, TimeUnit.SECONDS);
             mp.release();
             f.delete();
-        } catch (Exception ignore) { }
+        } catch (Exception e) { Gunluk.yaz(ctx, "      cal: istisna " + e); }
     }
 
     private void yedekSeslendir(String metin) {
