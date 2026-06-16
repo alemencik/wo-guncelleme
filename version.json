@@ -1,6 +1,6 @@
 {
-  "versionCode": 5,
-  "versionName": "5.0",
+  "versionCode": 6,
+  "versionName": "6.0",
   "url": "https://raw.githubusercontent.com/alemencik/wo-guncelleme/main/whatsappokuyucu.apk",
-  "not": "Uzun mesaj artik sessiz. Aksam mesajlari duzeltildi. Kablosuz oto-guncelleme eklendi."
+  "not": "Edge TTS sesli okuma (WhatsApp=Ahmet, ntfy=Emel). 20 kelimeden uzun mesaj sessiz. Selamlar kaldirildi. Mesai 09-18 + resmi tatil."
 }
