@@ -81,6 +81,8 @@ public class BildirimDinleyici extends NotificationListenerService {
         sonOkunanlar.put(imza, simdi);
 
         if (whatsapp) {
+            // WhatsApp'in kendi sistem/durum bildirimleri (baslik "WhatsApp") okunmaz
+            if ("WhatsApp".equalsIgnoreCase(title)) { Gunluk.yaz(this, "  ATLA: whatsapp sistem bildirimi"); return; }
             // ozet bildirimi atla
             if (OZET.matcher(text).matches()) { Gunluk.yaz(this, "  ATLA: ozet eslesti"); return; }
             // 20+ kelime → SESSIZCE atla (uyari yok)

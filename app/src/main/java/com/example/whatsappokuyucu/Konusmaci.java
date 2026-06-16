@@ -65,7 +65,7 @@ public class Konusmaci {
 
     private void cal(byte[] mp3) {
         try {
-            File f = File.createTempFile("wo", ".mp3", ctx.getCacheDir());
+            File f = File.createTempFile("woku", ".mp3", ctx.getCacheDir()); // onek >=3 karakter olmali
             try (FileOutputStream o = new FileOutputStream(f)) { o.write(mp3); }
             final CountDownLatch latch = new CountDownLatch(1);
             MediaPlayer mp = new MediaPlayer();
