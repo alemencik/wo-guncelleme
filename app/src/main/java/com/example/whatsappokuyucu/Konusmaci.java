@@ -22,7 +22,7 @@ public class Konusmaci {
     public static final String SES_KADIN = "tr-TR-EmelNeural";  // ntfy
 
     private final Context ctx;
-    private final EdgeTts edge = new EdgeTts();
+    private final EdgeTts edge;
     // her oge: [0]=metin, [1]=ses adi
     private final LinkedBlockingQueue<String[]> kuyruk = new LinkedBlockingQueue<>();
     private TextToSpeech yedekTts;
@@ -31,6 +31,7 @@ public class Konusmaci {
 
     public Konusmaci(Context c) {
         ctx = c.getApplicationContext();
+        edge = new EdgeTts(ctx);
         yedekTts = new TextToSpeech(ctx, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 yedekTts.setLanguage(new Locale("tr", "TR"));
@@ -52,9 +53,10 @@ public class Konusmaci {
         while (true) {
             try {
                 String[] oge = kuyruk.take();
+                Gunluk.yaz(ctx, "  KUYRUK al, Edge cagriliyor: " + oge[1]);
                 byte[] mp3 = edge.synthesize(oge[0], oge[1]);
-                if (mp3 != null) cal(mp3);
-                else yedekSeslendir(oge[0]);
+                if (mp3 != null) { Gunluk.yaz(ctx, "  Edge OK (" + mp3.length + " bayt), cal"); cal(mp3); }
+                else { Gunluk.yaz(ctx, "  Edge NULL -> Google yedek (kadin ses)"); yedekSeslendir(oge[0]); }
             } catch (InterruptedException e) {
                 return;
             } catch (Exception ignore) { }

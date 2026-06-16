@@ -39,6 +39,7 @@ public class BildirimDinleyici extends NotificationListenerService {
         ayar = new Ayar(this);
         takvim = new Takvim(this);
         yeniTatilTazele();
+        Gunluk.yaz(this, "== LISTENER CONNECTED ==");
     }
 
     @Override public void onNotificationPosted(StatusBarNotification sbn) {
@@ -47,45 +48,49 @@ public class BildirimDinleyici extends NotificationListenerService {
         boolean whatsapp = WHATSAPP.equals(paket);
         boolean ntfy = NTFY.equals(paket);
         if (!whatsapp && !ntfy) return;
+        Gunluk.yaz(this, "POST paket=" + paket);
 
         // Ana on/off
-        if (!ayar.okumaAcik()) return;
+        if (!ayar.okumaAcik()) { Gunluk.yaz(this, "  ATLA: okuma kapali"); return; }
         // Mesai saatleri disinda okuma yok
-        if (!ayar.simdiOkunsun()) return;
+        if (!ayar.simdiOkunsun()) { Gunluk.yaz(this, "  ATLA: mesai disi (bas=" + ayar.mesaiBas() + " bit=" + ayar.mesaiBit() + " aktif=" + ayar.mesaiAktif() + ")"); return; }
         // Resmi tatilde okuma yok
         yeniTatilTazele();
-        if (ayar.tatildeKapali() && takvim.bugunTatil()) return;
+        if (ayar.tatildeKapali() && takvim.bugunTatil()) { Gunluk.yaz(this, "  ATLA: tatil"); return; }
 
         Notification n = sbn.getNotification();
-        if (n == null) return;
+        if (n == null) { Gunluk.yaz(this, "  ATLA: notification null"); return; }
         // Grup ozeti bildirimi son mesajin metnini tekrar tasir → cift okumayi onlemek icin atla
-        if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) return;
+        if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) { Gunluk.yaz(this, "  ATLA: grup ozeti"); return; }
         Bundle ex = n.extras;
-        if (ex == null) return;
+        if (ex == null) { Gunluk.yaz(this, "  ATLA: extras null"); return; }
 
         CharSequence titleCs = ex.getCharSequence(Notification.EXTRA_TITLE);
         CharSequence textCs = ex.getCharSequence(Notification.EXTRA_TEXT);
         String title = titleCs != null ? titleCs.toString().trim() : "";
         String text = textCs != null ? textCs.toString().trim() : "";
-        if (TextUtils.isEmpty(text)) return;
+        Gunluk.yaz(this, "  title=" + title + " | text=" + text);
+        if (TextUtils.isEmpty(text)) { Gunluk.yaz(this, "  ATLA: text bos"); return; }
 
         // CIFT OKUMA ONLEME: ayni bildirim (anahtar+metin) kisa surede tekrar gelirse atla
         String imza = sbn.getKey() + "|" + title + "|" + text;
         long simdi = System.currentTimeMillis();
         sonOkunanlar.values().removeIf(t -> simdi - t > 60_000L); // eski kayitlari temizle
         Long oncekiZaman = sonOkunanlar.get(imza);
-        if (oncekiZaman != null && simdi - oncekiZaman < TEKRAR_PENCERE) return;
+        if (oncekiZaman != null && simdi - oncekiZaman < TEKRAR_PENCERE) { Gunluk.yaz(this, "  ATLA: tekrar (dedup)"); return; }
         sonOkunanlar.put(imza, simdi);
 
         if (whatsapp) {
             // ozet bildirimi atla
-            if (OZET.matcher(text).matches()) return;
+            if (OZET.matcher(text).matches()) { Gunluk.yaz(this, "  ATLA: ozet eslesti"); return; }
             // 20+ kelime → SESSIZCE atla (uyari yok)
-            if (kelimeSay(text) > MAKS_KELIME) return;
+            if (kelimeSay(text) > MAKS_KELIME) { Gunluk.yaz(this, "  ATLA: 20+ kelime"); return; }
             // SADECE mesaj metni, Ahmet sesiyle (gonderen adi okunmaz)
+            Gunluk.yaz(this, "  -> SESLENDIR (Ahmet): " + text);
             konusmaci.seslendir(text, Konusmaci.SES_ERKEK);
         } else { // ntfy → Emel, tam oku
             String soylenecek = TextUtils.isEmpty(title) ? text : title + ". " + text;
+            Gunluk.yaz(this, "  -> SESLENDIR (Emel): " + soylenecek);
             konusmaci.seslendir(soylenecek, Konusmaci.SES_KADIN);
         }
     }

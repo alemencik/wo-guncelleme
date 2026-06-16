@@ -1,5 +1,6 @@
 package com.example.whatsappokuyucu;
 
+import android.content.Context;
 import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
@@ -37,6 +38,10 @@ public class EdgeTts {
             .readTimeout(30, TimeUnit.SECONDS)
             .build();
 
+    private final Context ctx;
+
+    public EdgeTts(Context c) { ctx = c != null ? c.getApplicationContext() : null; }
+
     /** Metni sese cevir. Hata/zaman asiminda null doner. */
     public byte[] synthesize(String text, String voice) {
         try {
@@ -72,7 +77,9 @@ public class EdgeTts {
                     if (start < b.length) audio.write(b, start, b.length - start);
                 }
                 @Override public void onFailure(WebSocket w, Throwable e, Response r) {
-                    Log.w(TAG, "WS HATA" + (r != null ? " (HTTP " + r.code() + ")" : "") + ": " + e, e);
+                    String msg = "WS HATA" + (r != null ? " (HTTP " + r.code() + ")" : "") + ": " + e;
+                    Log.w(TAG, msg, e);
+                    Gunluk.yaz(ctx, "    EdgeTts " + msg);
                     done.countDown();
                 }
                 @Override public void onClosed(WebSocket w, int c, String reason) { done.countDown(); }
@@ -84,11 +91,12 @@ public class EdgeTts {
                 Log.d(TAG, "Edge BASARILI: " + audio.size() + " bayt mp3");
                 return audio.toByteArray();
             }
-            Log.w(TAG, "Edge BASARISIZ (ok=" + ok[0] + ", bayt=" + audio.size()
-                    + ") -> telefon TTS'ine dusulecek");
+            Log.w(TAG, "Edge BASARISIZ (ok=" + ok[0] + ", bayt=" + audio.size() + ")");
+            Gunluk.yaz(ctx, "    EdgeTts BASARISIZ (ok=" + ok[0] + ", bayt=" + audio.size() + ")");
             return null;
         } catch (Exception e) {
             Log.w(TAG, "Edge istisna: " + e, e);
+            Gunluk.yaz(ctx, "    EdgeTts istisna: " + e);
             return null;
         }
     }
