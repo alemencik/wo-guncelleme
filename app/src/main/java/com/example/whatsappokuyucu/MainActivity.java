@@ -1,6 +1,7 @@
 package com.example.whatsappokuyucu;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.InputType;
@@ -71,6 +72,15 @@ public class MainActivity extends AppCompatActivity {
         tatil.setOnCheckedChangeListener((v, c) -> ayar.tatildeKapali(c));
         kok.addView(tatil);
 
+        // UZAKTAN KOMUT NUMARASI (bu numaradan "off"/"on" gelince okuma kapanir/acilir)
+        TextView komutEt = new TextView(this);
+        komutEt.setText("\nUzaktan komut numarasi (bu numaradan 'off'=kapat, 'on'=ac):");
+        kok.addView(komutEt);
+        EditText komut = new EditText(this);
+        komut.setInputType(InputType.TYPE_CLASS_PHONE);
+        komut.setText(ayar.komutNumara());
+        kok.addView(komut);
+
         // SESLER bilgi
         TextView ses = new TextView(this);
         ses.setText("\nSesler: WhatsApp = Ahmet (erkek), ntfy bildirimleri = Emel (kadin).\n"
@@ -84,6 +94,19 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
         kok.addView(izin);
 
+        // KURULUM IZNI (oto-guncelleme icin "bilinmeyen kaynaktan kurulum")
+        Button kurulumIzni = new Button(this);
+        kurulumIzni.setText("Kurulum izni ver (guncelleme icin)");
+        kurulumIzni.setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (Exception e) {
+                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES));
+            }
+        });
+        kok.addView(kurulumIzni);
+
         // GUNCELLEME
         Button gun = new Button(this);
         gun.setText("Guncellemeyi kontrol et");
@@ -95,12 +118,13 @@ public class MainActivity extends AppCompatActivity {
 
         // KAYDET (mesai saatleri)
         Button kaydet = new Button(this);
-        kaydet.setText("Saatleri kaydet");
+        kaydet.setText("Kaydet (saatler + komut no)");
         kaydet.setOnClickListener(v -> {
             Integer b1 = parseDk(bas.getText().toString());
             Integer b2 = parseDk(bit.getText().toString());
             if (b1 != null) ayar.mesaiBas(b1);
             if (b2 != null) ayar.mesaiBit(b2);
+            ayar.komutNumara(komut.getText().toString());
             Toast.makeText(this, "Kaydedildi", Toast.LENGTH_SHORT).show();
         });
         kok.addView(kaydet);

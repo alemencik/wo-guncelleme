@@ -46,6 +46,12 @@ public class Guncelleyici {
             int yerelKod = yerelVersionCode();
             if (uzakKod <= yerelKod) return; // guncel
 
+            // "Bilinmeyen kaynaktan kurulum" izni yoksa bos yere indirme (her acilista tekrar inmesin)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                    && !ctx.getPackageManager().canRequestPackageInstalls()) {
+                return;
+            }
+
             File apk = indir(url);
             if (apk != null) kur(apk);
         } catch (Exception ignore) { }

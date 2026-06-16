@@ -7,6 +7,7 @@ import android.service.notification.StatusBarNotification;
 import android.text.TextUtils;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
@@ -35,9 +36,10 @@ public class BildirimDinleyici extends NotificationListenerService {
     private static final long TEKRAR_PENCERE = 15_000L; // ayni mesaj 15 sn icinde tekrar okunmaz
 
     @Override public void onListenerConnected() {
-        konusmaci = new Konusmaci(this);
-        ayar = new Ayar(this);
-        takvim = new Takvim(this);
+        // Tekrar bağlanmalarda yeniden yaratma (yoksa her rebind'de TTS motoru + thread sizar)
+        if (konusmaci == null) konusmaci = new Konusmaci(this);
+        if (ayar == null) ayar = new Ayar(this);
+        if (takvim == null) takvim = new Takvim(this);
         yeniTatilTazele();
         Gunluk.yaz(this, "== LISTENER CONNECTED ==");
     }
@@ -48,29 +50,39 @@ public class BildirimDinleyici extends NotificationListenerService {
         boolean whatsapp = WHATSAPP.equals(paket);
         boolean ntfy = NTFY.equals(paket);
         if (!whatsapp && !ntfy) return;
-        Gunluk.yaz(this, "POST paket=" + paket);
-
-        // Ana on/off
-        if (!ayar.okumaAcik()) { Gunluk.yaz(this, "  ATLA: okuma kapali"); return; }
-        // Mesai saatleri disinda okuma yok
-        if (!ayar.simdiOkunsun()) { Gunluk.yaz(this, "  ATLA: mesai disi (bas=" + ayar.mesaiBas() + " bit=" + ayar.mesaiBit() + " aktif=" + ayar.mesaiAktif() + ")"); return; }
-        // Resmi tatilde okuma yok
-        yeniTatilTazele();
-        if (ayar.tatildeKapali() && takvim.bugunTatil()) { Gunluk.yaz(this, "  ATLA: tatil"); return; }
 
         Notification n = sbn.getNotification();
-        if (n == null) { Gunluk.yaz(this, "  ATLA: notification null"); return; }
+        if (n == null) return;
         // Grup ozeti bildirimi son mesajin metnini tekrar tasir → cift okumayi onlemek icin atla
         if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) { Gunluk.yaz(this, "  ATLA: grup ozeti"); return; }
         Bundle ex = n.extras;
-        if (ex == null) { Gunluk.yaz(this, "  ATLA: extras null"); return; }
+        if (ex == null) return;
 
         CharSequence titleCs = ex.getCharSequence(Notification.EXTRA_TITLE);
         CharSequence textCs = ex.getCharSequence(Notification.EXTRA_TEXT);
         String title = titleCs != null ? titleCs.toString().trim() : "";
         String text = textCs != null ? textCs.toString().trim() : "";
-        Gunluk.yaz(this, "  title=" + title + " | text=" + text);
-        if (TextUtils.isEmpty(text)) { Gunluk.yaz(this, "  ATLA: text bos"); return; }
+        Gunluk.yaz(this, "POST paket=" + paket + " title=" + title + " | text=" + text);
+        if (TextUtils.isEmpty(text)) return;
+
+        // UZAKTAN KOMUT: yetkili numaradan "on"/"off" → okumayi ac/kapat (mesaj okunmaz, mesai/okuma kontrolundan ONCE)
+        if (whatsapp && ayar.komutYetkili(title)) {
+            String k = text.toLowerCase(Locale.US).trim();
+            if (k.equals("off") || k.equals("kapat") || k.equals("sus")) {
+                ayar.okumaAcik(false); Gunluk.yaz(this, "  KOMUT: okuma KAPATILDI (" + title + ")"); return;
+            }
+            if (k.equals("on") || k.equals("ac") || k.equals("aç") || k.equals("ac.")) {
+                ayar.okumaAcik(true); Gunluk.yaz(this, "  KOMUT: okuma ACILDI (" + title + ")"); return;
+            }
+        }
+
+        // Ana on/off
+        if (!ayar.okumaAcik()) { Gunluk.yaz(this, "  ATLA: okuma kapali"); return; }
+        // Mesai saatleri disinda okuma yok
+        if (!ayar.simdiOkunsun()) { Gunluk.yaz(this, "  ATLA: mesai disi"); return; }
+        // Resmi tatilde okuma yok
+        yeniTatilTazele();
+        if (ayar.tatildeKapali() && takvim.bugunTatil()) { Gunluk.yaz(this, "  ATLA: tatil"); return; }
 
         // CIFT OKUMA ONLEME: ayni bildirim (anahtar+metin) kisa surede tekrar gelirse atla
         String imza = sbn.getKey() + "|" + title + "|" + text;
@@ -85,21 +97,35 @@ public class BildirimDinleyici extends NotificationListenerService {
             if ("WhatsApp".equalsIgnoreCase(title)) { Gunluk.yaz(this, "  ATLA: whatsapp sistem bildirimi"); return; }
             // ozet bildirimi atla
             if (OZET.matcher(text).matches()) { Gunluk.yaz(this, "  ATLA: ozet eslesti"); return; }
+            // emoji/URL temizle, sonra oku
+            String temiz = temizle(text);
+            if (TextUtils.isEmpty(temiz)) { Gunluk.yaz(this, "  ATLA: temizleyince bos (emoji/link)"); return; }
             // 20+ kelime → SESSIZCE atla (uyari yok)
-            if (kelimeSay(text) > MAKS_KELIME) { Gunluk.yaz(this, "  ATLA: 20+ kelime"); return; }
+            if (kelimeSay(temiz) > MAKS_KELIME) { Gunluk.yaz(this, "  ATLA: 20+ kelime"); return; }
             // SADECE mesaj metni, Ahmet sesiyle (gonderen adi okunmaz)
-            Gunluk.yaz(this, "  -> SESLENDIR (Ahmet): " + text);
-            konusmaci.seslendir(text, Konusmaci.SES_ERKEK);
+            Gunluk.yaz(this, "  -> SESLENDIR (Ahmet): " + temiz);
+            konusmaci.seslendir(temiz, Konusmaci.SES_ERKEK);
         } else { // ntfy → Emel, tam oku
-            String soylenecek = TextUtils.isEmpty(title) ? text : title + ". " + text;
-            Gunluk.yaz(this, "  -> SESLENDIR (Emel): " + soylenecek);
-            konusmaci.seslendir(soylenecek, Konusmaci.SES_KADIN);
+            String temiz = temizle(TextUtils.isEmpty(title) ? text : title + ". " + text);
+            if (TextUtils.isEmpty(temiz)) return;
+            Gunluk.yaz(this, "  -> SESLENDIR (Emel): " + temiz);
+            konusmaci.seslendir(temiz, Konusmaci.SES_KADIN);
         }
     }
 
     private static int kelimeSay(String s) {
         if (s == null || s.trim().isEmpty()) return 0;
         return s.trim().split("\\s+").length;
+    }
+
+    // URL'leri ve emoji/sembolleri at, bosluklari sadeles. (TTS daha dogal okur)
+    private static String temizle(String s) {
+        if (s == null) return "";
+        String t = s.replaceAll("https?://\\S+", " ").replaceAll("(?i)www\\.\\S+", " ");
+        // emoji + cesitli sembol araliklari
+        t = t.replaceAll("[\\x{1F000}-\\x{1FAFF}\\x{2600}-\\x{27BF}\\x{2190}-\\x{21FF}\\x{2B00}-\\x{2BFF}"
+                + "\\x{2300}-\\x{23FF}\\x{FE00}-\\x{FE0F}\\x{200D}\\x{20E3}\\x{1F1E6}-\\x{1F1FF}]", "");
+        return t.replaceAll("\\s+", " ").trim();
     }
 
     private void yeniTatilTazele() {

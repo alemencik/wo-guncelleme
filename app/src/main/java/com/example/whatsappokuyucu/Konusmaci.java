@@ -2,6 +2,7 @@ package com.example.whatsappokuyucu;
 
 import android.content.Context;
 import android.media.AudioAttributes;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.speech.tts.TextToSpeech;
 
@@ -64,6 +65,10 @@ public class Konusmaci {
     }
 
     private void cal(byte[] mp3) {
+        AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
+        AudioManager.OnAudioFocusChangeListener afl = f -> { };
+        if (am != null) am.requestAudioFocus(afl, AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK); // calan muzigi kis, sonra geri ver
         try {
             File f = File.createTempFile("woku", ".mp3", ctx.getCacheDir()); // onek >=3 karakter olmali
             try (FileOutputStream o = new FileOutputStream(f)) { o.write(mp3); }
@@ -83,6 +88,7 @@ public class Konusmaci {
             mp.release();
             f.delete();
         } catch (Exception e) { Gunluk.yaz(ctx, "      cal: istisna " + e); }
+        finally { if (am != null) am.abandonAudioFocus(afl); }
     }
 
     private void yedekSeslendir(String metin) {

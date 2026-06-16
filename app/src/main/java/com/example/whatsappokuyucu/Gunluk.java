@@ -14,9 +14,12 @@ import java.util.Locale;
  * adb ile okunabilir: adb shell cat /sdcard/Android/data/com.example.whatsappokuyucu/files/debug.log
  */
 public class Gunluk {
+    /** Teshis gunlugu varsayilan KAPALI. Sorun olursa true yapip yeniden derle. */
+    public static boolean AKTIF = false;
+
     public static synchronized void yaz(Context c, String s) {
         try {
-            if (c == null) return;
+            if (!AKTIF || c == null) return;
             File d = c.getExternalFilesDir(null);
             if (d == null) return;
             File f = new File(d, "debug.log");

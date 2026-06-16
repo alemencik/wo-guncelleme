@@ -27,6 +27,19 @@ public class Ayar {
     public int mesaiBit() { return p.getInt("mesai_bit", 18 * 60); }  // varsayilan 18:00
     public void mesaiBit(int dk) { p.edit().putInt("mesai_bit", dk).apply(); }
 
+    // Uzaktan komut (on/off) icin yetkili numara. Bos = komut kapali.
+    public String komutNumara() { return p.getString("komut_numara", "05456720101"); }
+    public void komutNumara(String v) { p.edit().putString("komut_numara", v == null ? "" : v.trim()).apply(); }
+
+    /** Bildirim basligi (gonderen) yetkili komut numarasina ait mi? Son 7 haneyi karsilastirir. */
+    public boolean komutYetkili(String baslik) {
+        if (baslik == null) return false;
+        String a = baslik.replaceAll("\\D", "");
+        String b = komutNumara().replaceAll("\\D", "");
+        if (a.length() < 7 || b.length() < 7) return false;
+        return a.substring(a.length() - 7).equals(b.substring(b.length() - 7));
+    }
+
     /** Su an okuma yapilmali mi? Mesai kapaliysa her zaman true; aciksa saat araliginda mi? */
     public boolean simdiOkunsun() {
         if (!mesaiAktif()) return true;

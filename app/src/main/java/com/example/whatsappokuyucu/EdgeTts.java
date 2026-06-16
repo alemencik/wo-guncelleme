@@ -86,7 +86,7 @@ public class EdgeTts {
             });
 
             done.await(30, TimeUnit.SECONDS);
-            ws.cancel();
+            if (!ok[0]) ws.cancel(); // basarida soket zaten turn.end'de kapandi; tekrar cancel sahte "Socket closed" hatasi uretiyordu
             if (ok[0] && audio.size() > 0) {
                 Log.d(TAG, "Edge BASARILI: " + audio.size() + " bayt mp3");
                 return audio.toByteArray();
