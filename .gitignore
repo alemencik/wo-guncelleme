@@ -1,0 +1,7 @@
+release.jks
+ks.b64
+*.jks
+.gradle/
+build/
+app/build/
+local.properties

@@ -1,0 +1,61 @@
+name: build-apk
+
+on:
+  push:
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Keystore'u coz
+        run: echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: APK derle (imzali)
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: APK'yi + version.json'u yayinla
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk whatsappokuyucu.apk
+          VC=$(grep -oP 'versionCode \K[0-9]+' app/build.gradle)
+          VN=$(grep -oP 'versionName "\K[^"]+' app/build.gradle)
+          cat > version.json <<EOF
+          {
+            "versionCode": $VC,
+            "versionName": "$VN",
+            "url": "https://raw.githubusercontent.com/alemencik/wo-guncelleme/main/whatsappokuyucu.apk",
+            "not": "Edge TTS sesli okuma (WhatsApp=Ahmet, ntfy=Emel). 20 kelimeden uzun mesaj sessiz. Selamlar kaldirildi. Mesai 09-18 + resmi tatil."
+          }
+          EOF
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add whatsappokuyucu.apk version.json
+          git commit -m "build: APK v$VN [skip ci]" || echo "degisiklik yok"
+          git push
