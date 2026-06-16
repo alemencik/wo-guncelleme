@@ -6,13 +6,15 @@ import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.text.TextUtils;
 
+import java.util.HashMap;
 import java.util.regex.Pattern;
 
 /**
  * Bildirimleri dinler:
- *   - WhatsApp (com.whatsapp)   → Ahmet (erkek) sesiyle, 20+ kelime SESSIZCE atlanir
+ *   - WhatsApp (com.whatsapp)   → Ahmet (erkek) sesiyle, SADECE mesaj metni (gonderen adi okunmaz), 20+ kelime SESSIZCE atlanir
  *   - ntfy     (io.heckel.ntfy) → Emel (kadin) sesiyle, tam okunur (kelime siniri yok)
  * Selam/nezaket YOK. Mesai saatleri + resmi tatil disinda okumaz. Ana on/off anahtari.
+ * Cift okuma onleme: grup ozeti atlanir + ayni mesaj kisa surede tekrar gelirse okunmaz.
  */
 public class BildirimDinleyici extends NotificationListenerService {
 
@@ -28,6 +30,9 @@ public class BildirimDinleyici extends NotificationListenerService {
     private Ayar ayar;
     private Takvim takvim;
     private long sonTatilTazel = 0;
+    // CIFT OKUMA ONLEME: en son okunan bildirim imzalari (anahtar+metin) -> zaman
+    private final HashMap<String, Long> sonOkunanlar = new HashMap<>();
+    private static final long TEKRAR_PENCERE = 15_000L; // ayni mesaj 15 sn icinde tekrar okunmaz
 
     @Override public void onListenerConnected() {
         konusmaci = new Konusmaci(this);
@@ -53,6 +58,8 @@ public class BildirimDinleyici extends NotificationListenerService {
 
         Notification n = sbn.getNotification();
         if (n == null) return;
+        // Grup ozeti bildirimi son mesajin metnini tekrar tasir → cift okumayi onlemek icin atla
+        if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) return;
         Bundle ex = n.extras;
         if (ex == null) return;
 
@@ -62,14 +69,21 @@ public class BildirimDinleyici extends NotificationListenerService {
         String text = textCs != null ? textCs.toString().trim() : "";
         if (TextUtils.isEmpty(text)) return;
 
+        // CIFT OKUMA ONLEME: ayni bildirim (anahtar+metin) kisa surede tekrar gelirse atla
+        String imza = sbn.getKey() + "|" + title + "|" + text;
+        long simdi = System.currentTimeMillis();
+        sonOkunanlar.values().removeIf(t -> simdi - t > 60_000L); // eski kayitlari temizle
+        Long oncekiZaman = sonOkunanlar.get(imza);
+        if (oncekiZaman != null && simdi - oncekiZaman < TEKRAR_PENCERE) return;
+        sonOkunanlar.put(imza, simdi);
+
         if (whatsapp) {
             // ozet bildirimi atla
             if (OZET.matcher(text).matches()) return;
             // 20+ kelime → SESSIZCE atla (uyari yok)
             if (kelimeSay(text) > MAKS_KELIME) return;
-            // gonderen + mesaj, Ahmet sesiyle
-            String soylenecek = TextUtils.isEmpty(title) ? text : title + ". " + text;
-            konusmaci.seslendir(soylenecek, Konusmaci.SES_ERKEK);
+            // SADECE mesaj metni, Ahmet sesiyle (gonderen adi okunmaz)
+            konusmaci.seslendir(text, Konusmaci.SES_ERKEK);
         } else { // ntfy → Emel, tam oku
             String soylenecek = TextUtils.isEmpty(title) ? text : title + ". " + text;
             konusmaci.seslendir(soylenecek, Konusmaci.SES_KADIN);

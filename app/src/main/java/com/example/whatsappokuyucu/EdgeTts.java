@@ -1,5 +1,7 @@
 package com.example.whatsappokuyucu;
 
+import android.util.Log;
+
 import java.io.ByteArrayOutputStream;
 import java.security.MessageDigest;
 import java.util.UUID;
@@ -20,8 +22,13 @@ import okio.ByteString;
  */
 public class EdgeTts {
 
+    private static final String TAG = "EdgeTts";
     private static final String TRUSTED_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
-    private static final String GEC_VERSION = "1-130.0.2849.68";
+    // Guncel Chromium surumu (edge-tts referansiyla ayni). Eskidikce buyutulebilir.
+    private static final String GEC_VERSION = "1-143.0.3650.75";
+    private static final String CHROME_UA =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            + "(KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0";
     private static final String BASE =
             "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1";
 
@@ -40,9 +47,7 @@ public class EdgeTts {
             Request req = new Request.Builder()
                     .url(url)
                     .header("Origin", "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold")
-                    .header("User-Agent",
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                            + "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0")
+                    .header("User-Agent", CHROME_UA)
                     .build();
 
             final ByteArrayOutputStream audio = new ByteArrayOutputStream();
@@ -52,6 +57,7 @@ public class EdgeTts {
 
             WebSocket ws = client.newWebSocket(req, new WebSocketListener() {
                 @Override public void onOpen(WebSocket w, Response r) {
+                    Log.d(TAG, "WS acildi (HTTP " + r.code() + ") ses=" + voice);
                     w.send(configMsg());
                     w.send(ssmlMsg(reqId, text, voice));
                 }
@@ -65,15 +71,24 @@ public class EdgeTts {
                     int start = 2 + headerLen;
                     if (start < b.length) audio.write(b, start, b.length - start);
                 }
-                @Override public void onFailure(WebSocket w, Throwable e, Response r) { done.countDown(); }
+                @Override public void onFailure(WebSocket w, Throwable e, Response r) {
+                    Log.w(TAG, "WS HATA" + (r != null ? " (HTTP " + r.code() + ")" : "") + ": " + e, e);
+                    done.countDown();
+                }
                 @Override public void onClosed(WebSocket w, int c, String reason) { done.countDown(); }
             });
 
             done.await(30, TimeUnit.SECONDS);
             ws.cancel();
-            if (ok[0] && audio.size() > 0) return audio.toByteArray();
+            if (ok[0] && audio.size() > 0) {
+                Log.d(TAG, "Edge BASARILI: " + audio.size() + " bayt mp3");
+                return audio.toByteArray();
+            }
+            Log.w(TAG, "Edge BASARISIZ (ok=" + ok[0] + ", bayt=" + audio.size()
+                    + ") -> telefon TTS'ine dusulecek");
             return null;
         } catch (Exception e) {
+            Log.w(TAG, "Edge istisna: " + e, e);
             return null;
         }
     }
@@ -101,9 +116,11 @@ public class EdgeTts {
     }
 
     private static String ts() {
-        return new java.text.SimpleDateFormat(
+        java.text.SimpleDateFormat f = new java.text.SimpleDateFormat(
                 "EEE MMM dd yyyy HH:mm:ss 'GMT+0000 (Coordinated Universal Time)'",
-                java.util.Locale.US).format(new java.util.Date());
+                java.util.Locale.US);
+        f.setTimeZone(java.util.TimeZone.getTimeZone("UTC")); // etiketle ('GMT+0000') tutarli
+        return f.format(new java.util.Date());
     }
 
     /** Sec-MS-GEC token: SHA256( ticks(5dk yuvarlanmis) + trustedToken ). */
