@@ -56,8 +56,13 @@ public class Konusmaci {
                 String[] oge = kuyruk.take();
                 Gunluk.yaz(ctx, "  KUYRUK al, Edge cagriliyor: " + oge[1]);
                 byte[] mp3 = edge.synthesize(oge[0], oge[1]);
+                if (mp3 == null) { // anlik hata olabilir: kisa bekle, bir kez daha dene (Google'a dusmeden once)
+                    Gunluk.yaz(ctx, "  Edge NULL -> 1.5sn sonra TEKRAR dene");
+                    try { Thread.sleep(1500); } catch (InterruptedException ie) { return; }
+                    mp3 = edge.synthesize(oge[0], oge[1]);
+                }
                 if (mp3 != null) { Gunluk.yaz(ctx, "  Edge OK (" + mp3.length + " bayt), cal"); cal(mp3); }
-                else { Gunluk.yaz(ctx, "  Edge NULL -> Google yedek (kadin ses)"); yedekSeslendir(oge[0]); }
+                else { Gunluk.yaz(ctx, "  Edge yine NULL -> Google yedek"); yedekSeslendir(oge[0]); }
             } catch (InterruptedException e) {
                 return;
             } catch (Exception ignore) { }
