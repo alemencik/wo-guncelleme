@@ -15,7 +15,7 @@ import java.util.Locale;
  */
 public class Gunluk {
     /** Teshis gunlugu varsayilan KAPALI. Sorun olursa true yapip yeniden derle. */
-    public static boolean AKTIF = true;
+    public static boolean AKTIF = false;
 
     public static synchronized void yaz(Context c, String s) {
         try {
