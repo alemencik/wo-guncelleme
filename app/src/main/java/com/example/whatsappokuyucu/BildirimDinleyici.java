@@ -105,11 +105,11 @@ public class BildirimDinleyici extends NotificationListenerService {
             // SADECE mesaj metni, Ahmet sesiyle (gonderen adi okunmaz)
             Gunluk.yaz(this, "  -> SESLENDIR (Ahmet): " + temiz);
             konusmaci.seslendir(temiz, Konusmaci.SES_ERKEK);
-        } else { // ntfy → Emel, SADECE mesaj metni (baslik/uygulama adi okunmaz)
+        } else { // ntfy → Ahmet (dogal erkek), SADECE mesaj metni (baslik/uygulama adi okunmaz)
             String temiz = temizle(text);
             if (TextUtils.isEmpty(temiz)) return;
-            Gunluk.yaz(this, "  -> SESLENDIR (Emel): " + temiz);
-            konusmaci.seslendir(temiz, Konusmaci.SES_KADIN);
+            Gunluk.yaz(this, "  -> SESLENDIR (Ahmet): " + temiz);
+            konusmaci.seslendir(temiz, Konusmaci.SES_ERKEK);
         }
     }
 
