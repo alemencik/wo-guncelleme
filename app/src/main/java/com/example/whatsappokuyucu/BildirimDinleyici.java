@@ -102,15 +102,35 @@ public class BildirimDinleyici extends NotificationListenerService {
             if (TextUtils.isEmpty(temiz)) { Gunluk.yaz(this, "  ATLA: temizleyince bos (emoji/link)"); return; }
             // 20+ kelime → SESSIZCE atla (uyari yok)
             if (kelimeSay(temiz) > MAKS_KELIME) { Gunluk.yaz(this, "  ATLA: 20+ kelime"); return; }
-            // SADECE mesaj metni, Ahmet sesiyle (gonderen adi okunmaz)
-            Gunluk.yaz(this, "  -> SESLENDIR (Ahmet): " + temiz);
-            konusmaci.seslendir(temiz, Konusmaci.SES_ERKEK);
+            // GONDERENE GORE SES: gonderen adi baslikta ("Gonderen @ Grup" / birebir sohbet
+            // basligi) veya grup metninin BASINDA ("Gonderen: mesaj") olur. Mesaj icerigine
+            // bakilmaz ki metinde gecen "sirket" kelimesi yanlis ses tetiklemesin.
+            String ses = sesSec(title, text);
+            Gunluk.yaz(this, "  -> SESLENDIR (" + (Konusmaci.SES_KADIN.equals(ses) ? "Emel" : "Ahmet") + "): " + temiz);
+            konusmaci.seslendir(temiz, ses);
         } else { // ntfy → Ahmet (dogal erkek), SADECE mesaj metni (baslik/uygulama adi okunmaz)
             String temiz = temizle(text);
             if (TextUtils.isEmpty(temiz)) return;
             Gunluk.yaz(this, "  -> SESLENDIR (Ahmet): " + temiz);
             konusmaci.seslendir(temiz, Konusmaci.SES_ERKEK);
         }
+    }
+
+    /**
+     * Gonderene gore ses: "Av Gül" → Ahmet (erkek), "Şirket" → Emel (kadin).
+     * Gonderen adi baslikta veya grup metninin "Gonderen: ..." on ekinde aranir.
+     * Eslesme yoksa varsayilan Ahmet.
+     */
+    private static String sesSec(String title, String text) {
+        StringBuilder kim = new StringBuilder(title != null ? title : "");
+        if (text != null) {
+            int i = text.indexOf(':');
+            if (i > 0 && i <= 40) kim.append(' ').append(text, 0, i); // grup: "Gonderen: mesaj"
+        }
+        String k = kim.toString().toLowerCase(new Locale("tr", "TR"));
+        if (k.contains("şirket") || k.contains("sirket")) return Konusmaci.SES_KADIN;
+        if (k.contains("av gül") || k.contains("av gul")) return Konusmaci.SES_ERKEK;
+        return Konusmaci.SES_ERKEK; // varsayilan
     }
 
     private static int kelimeSay(String s) {
