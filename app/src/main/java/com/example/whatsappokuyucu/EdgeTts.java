@@ -42,8 +42,16 @@ public class EdgeTts {
 
     public EdgeTts(Context c) { ctx = c != null ? c.getApplicationContext() : null; }
 
-    /** Metni sese cevir. Hata/zaman asiminda null doner. */
+    /** Metni normal hizda sese cevir. */
     public byte[] synthesize(String text, String voice) {
+        return synthesize(text, voice, 0);
+    }
+
+    /**
+     * Metni sese cevir. Hata/zaman asiminda null doner.
+     * @param hizYuzde okuma hizi farki (0 = normal, 50 = 1.5x, 100 = 2x)
+     */
+    public byte[] synthesize(String text, String voice, int hizYuzde) {
         try {
             String url = BASE + "?TrustedClientToken=" + TRUSTED_TOKEN
                     + "&Sec-MS-GEC=" + secMsGec()
@@ -64,7 +72,7 @@ public class EdgeTts {
                 @Override public void onOpen(WebSocket w, Response r) {
                     Log.d(TAG, "WS acildi (HTTP " + r.code() + ") ses=" + voice);
                     w.send(configMsg());
-                    w.send(ssmlMsg(reqId, text, voice));
+                    w.send(ssmlMsg(reqId, text, voice, hizYuzde));
                 }
                 @Override public void onMessage(WebSocket w, String t) {
                     if (t.contains("Path:turn.end")) { ok[0] = true; w.close(1000, null); done.countDown(); }
@@ -110,9 +118,12 @@ public class EdgeTts {
                 + "\"outputFormat\":\"audio-24khz-48kbitrate-mono-mp3\"}}}}";
     }
 
-    private String ssmlMsg(String reqId, String text, String voice) {
+    private String ssmlMsg(String reqId, String text, String voice, int hizYuzde) {
+        String govde = esc(text);
+        if (hizYuzde != 0) // prosody rate: "+50%" = 1.5x, "+100%" = 2x
+            govde = "<prosody rate='" + (hizYuzde > 0 ? "+" : "") + hizYuzde + "%'>" + govde + "</prosody>";
         String ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='tr-TR'>"
-                + "<voice name='" + voice + "'>" + esc(text) + "</voice></speak>";
+                + "<voice name='" + voice + "'>" + govde + "</voice></speak>";
         return "X-RequestId:" + reqId + "\r\n"
                 + "Content-Type:application/ssml+xml\r\n"
                 + "X-Timestamp:" + ts() + "\r\n"

@@ -22,10 +22,17 @@ public class Konusmaci {
     public static final String SES_ERKEK = "tr-TR-AhmetNeural"; // WhatsApp
     public static final String SES_KADIN = "tr-TR-EmelNeural";  // ntfy
 
+    /** Kuyruk ogesi: ne okunacak, hangi sesle, hangi hizda, sonrasinda ne kadar susulacak. */
+    private static final class Oge {
+        final String metin, ses; final int hiz; final long bekleMs;
+        Oge(String metin, String ses, int hiz, long bekleMs) {
+            this.metin = metin; this.ses = ses; this.hiz = hiz; this.bekleMs = bekleMs;
+        }
+    }
+
     private final Context ctx;
     private final EdgeTts edge;
-    // her oge: [0]=metin, [1]=ses adi
-    private final LinkedBlockingQueue<String[]> kuyruk = new LinkedBlockingQueue<>();
+    private final LinkedBlockingQueue<Oge> kuyruk = new LinkedBlockingQueue<>();
     private TextToSpeech yedekTts;
     private volatile boolean yedekHazir = false;
     private Thread isci;
@@ -44,28 +51,60 @@ public class Konusmaci {
         isci.start();
     }
 
-    /** Belirli sesle seslendir (SES_ERKEK / SES_KADIN). */
+    /** Belirli sesle, normal hizda seslendir (SES_ERKEK / SES_KADIN). */
     public void seslendir(String metin, String ses) {
+        seslendir(metin, ses, 0, 0);
+    }
+
+    /**
+     * @param hiz     okuma hizi farki (0 = normal, 50 = 1.5x)
+     * @param bekleMs okuduktan sonra bu kadar sus (sonraki oge gecikir)
+     */
+    public void seslendir(String metin, String ses, int hiz, long bekleMs) {
         if (metin != null && !metin.trim().isEmpty())
-            kuyruk.offer(new String[]{ metin.trim(), ses != null ? ses : SES_ERKEK });
+            kuyruk.offer(new Oge(metin.trim(), ses != null ? ses : SES_ERKEK, hiz, bekleMs));
     }
 
     private void dongu() {
         while (true) {
             try {
-                String[] oge = kuyruk.take();
-                Gunluk.yaz(ctx, "  KUYRUK al, Edge cagriliyor: " + oge[1]);
-                byte[] mp3 = edge.synthesize(oge[0], oge[1]);
+                Oge oge = kuyruk.take();
+                gorusmeBiteneKadarBekle();
+                Gunluk.yaz(ctx, "  KUYRUK al, Edge cagriliyor: " + oge.ses
+                        + (oge.hiz != 0 ? " (hiz +" + oge.hiz + "%)" : ""));
+                byte[] mp3 = edge.synthesize(oge.metin, oge.ses, oge.hiz);
                 if (mp3 == null) { // anlik hata olabilir: kisa bekle, bir kez daha dene (Google'a dusmeden once)
                     Gunluk.yaz(ctx, "  Edge NULL -> 1.5sn sonra TEKRAR dene");
                     try { Thread.sleep(1500); } catch (InterruptedException ie) { return; }
-                    mp3 = edge.synthesize(oge[0], oge[1]);
+                    mp3 = edge.synthesize(oge.metin, oge.ses, oge.hiz);
                 }
                 if (mp3 != null) { Gunluk.yaz(ctx, "  Edge OK (" + mp3.length + " bayt), cal"); cal(mp3); }
-                else { Gunluk.yaz(ctx, "  Edge yine NULL -> Google yedek"); yedekSeslendir(oge[0]); }
+                else { Gunluk.yaz(ctx, "  Edge yine NULL -> Google yedek"); yedekSeslendir(oge.metin); }
+                if (oge.bekleMs > 0) Thread.sleep(oge.bekleMs);
             } catch (InterruptedException e) {
                 return;
             } catch (Exception ignore) { }
+        }
+    }
+
+    /**
+     * Telefon gorusmesi surerken okuma yapma; kuyrukta bekletir, gorusme bitince devam eder.
+     * AudioManager modu kullanilir — izin gerektirmez (READ_PHONE_STATE'e gerek yok).
+     * WhatsApp/Telegram sesli aramalari da MODE_IN_COMMUNICATION olarak gorunur.
+     */
+    private void gorusmeBiteneKadarBekle() throws InterruptedException {
+        AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+        boolean bildirildi = false;
+        while (true) {
+            int mod = am.getMode();
+            if (mod != AudioManager.MODE_IN_CALL && mod != AudioManager.MODE_IN_COMMUNICATION) break;
+            if (!bildirildi) { Gunluk.yaz(ctx, "  BEKLE: gorusme suruyor, kuyrukta tutuluyor"); bildirildi = true; }
+            Thread.sleep(2000);
+        }
+        if (bildirildi) {
+            Gunluk.yaz(ctx, "  DEVAM: gorusme bitti");
+            Thread.sleep(1500); // gorusme biter bitmez agzina okuma yapmasin
         }
     }
 
