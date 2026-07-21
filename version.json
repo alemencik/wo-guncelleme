@@ -1,6 +1,6 @@
 {
-  "versionCode": 17,
-  "versionName": "17.0",
+  "versionCode": 18,
+  "versionName": "18.0",
   "url": "https://raw.githubusercontent.com/alemencik/wo-guncelleme/main/whatsappokuyucu.apk",
-  "not": "v17: Sirket=Emel (kadin), Av Gul=Ahmet gonderen-bazli ses. 20 kelimeden uzun mesaj sessiz. Selamlar kaldirildi. Mesai 09-18 + resmi tatil."
+  "not": "v18: Emel SADECE sirket, herkes Ahmet. Gorusme sirasinda okumaz, kuyruga alir. 20+ kelime: ilk 15'i 1.5x okur, 1sn susar, espri kapanisi soyler. Kisaltma sozlugu (aa/slm/tmm...)."
 }
