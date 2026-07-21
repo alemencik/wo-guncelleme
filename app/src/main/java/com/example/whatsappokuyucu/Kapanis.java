@@ -11,10 +11,10 @@ public class Kapanis {
     private static final String[] CUMLELER = {
             "Kitap mı yazıyorsun kardeşim, kalanını kendin oku uğraşamayacam.",
             "Bu kadar yazacağına arasaydın mına koym.",
-            "Nefesin yetmedi okumaya, Allah kocana sabır versin.",
+            "Nefesim yetmedi okumaya, Allah kocana sabır versin.",
             "Veleddalin amiin. Ööffff.",
             "Kız parmakların acımıştır bunları yazarken. Getir öpeyim de geçsin.",
-            "Destan yazmış maşallah.",
+            "Destan yazmış maşşallah.",
             "Hiç mi üşenmedin bunu yazarken.",
             "Allah senin canını almasın, işediğini sıçtığını da yazsaydın.",
     };
