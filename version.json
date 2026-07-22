@@ -1,6 +1,6 @@
 {
-  "versionCode": 19,
-  "versionName": "19.0",
+  "versionCode": 20,
+  "versionName": "20.0",
   "url": "https://raw.githubusercontent.com/alemencik/wo-guncelleme/main/whatsappokuyucu.apk",
-  "not": "v19: Espri kapanisi KALDIRILDI. 20+ kelime: sadece ilk 15 kelime 1.5x hizda okunur. Diger her sey v18 gibi."
+  "not": "v20: 30 kelimeden uzun mesajlar HIC okunmaz. 21-30 kelime: ilk 15 kelime 1.5x. 20 ve alti: tam okunur."
 }
