@@ -21,8 +21,9 @@ public class BildirimDinleyici extends NotificationListenerService {
 
     private static final String WHATSAPP = "com.whatsapp";
     private static final String NTFY = "io.heckel.ntfy";
-    private static final int MAKS_KELIME = 20;  // bunun ustu "uzun mesaj" sayilir
-    private static final int OZET_KELIME = 15;  // uzun mesajda hizlica okunacak kelime sayisi
+    private static final int MAKS_KELIME = 20;    // bunun ustu "uzun mesaj" sayilir
+    private static final int OZET_KELIME = 15;    // uzun mesajda hizlica okunacak kelime sayisi
+    private static final int SESSIZ_SINIR = 30;   // bunun ustu HIC okunmaz (sessizce atlanir)
 
     // WhatsApp ozet bildirimleri ("3 yeni mesaj", "2 sohbet" vb.) — okunmaz
     private static final Pattern OZET = Pattern.compile(
@@ -107,8 +108,12 @@ public class BildirimDinleyici extends NotificationListenerService {
             String ses = sesSec(title, text);
             String kim = Konusmaci.SES_KADIN.equals(ses) ? "Emel" : "Ahmet";
 
-            // UZUN MESAJ: 20+ kelime ise sadece ilk 15 kelime 1.5x hizda okunur, gerisi atlanir.
-            if (kelimeSay(temiz) > MAKS_KELIME) {
+            // 30 kelimeden uzun mesaj SESSIZCE atlanir (hic okunmaz)
+            int adet = kelimeSay(temiz);
+            if (adet > SESSIZ_SINIR) { Gunluk.yaz(this, "  ATLA: " + adet + " kelime (30 ustu)"); return; }
+
+            // 21-30 kelime: sadece ilk 15 kelime 1.5x hizda okunur, gerisi atlanir.
+            if (adet > MAKS_KELIME) {
                 String bas = ilkKelimeler(temiz, OZET_KELIME);
                 Gunluk.yaz(this, "  -> SESLENDIR UZUN (" + kim + ", 1.5x): " + bas);
                 konusmaci.seslendir(bas, ses, 50, 0); // +50% = 1.5x
