@@ -51,7 +51,7 @@ jobs:
             "versionCode": $VC,
             "versionName": "$VN",
             "url": "https://raw.githubusercontent.com/alemencik/wo-guncelleme/main/whatsappokuyucu.apk",
-            "not": "v18: Emel SADECE sirket, herkes Ahmet. Gorusme sirasinda okumaz, kuyruga alir. 20+ kelime: ilk 15'i 1.5x okur, 1sn susar, espri kapanisi soyler. Kisaltma sozlugu (aa/slm/tmm...)."
+            "not": "v19: Espri kapanisi KALDIRILDI. 20+ kelime: sadece ilk 15 kelime 1.5x hizda okunur. Diger her sey v18 gibi."
           }
           EOF
           git config user.name "github-actions"

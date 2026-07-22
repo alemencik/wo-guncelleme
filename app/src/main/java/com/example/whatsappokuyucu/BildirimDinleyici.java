@@ -107,13 +107,11 @@ public class BildirimDinleyici extends NotificationListenerService {
             String ses = sesSec(title, text);
             String kim = Konusmaci.SES_KADIN.equals(ses) ? "Emel" : "Ahmet";
 
-            // UZUN MESAJ: 20+ kelime ise ilk 15'i 1.5x oku, 1 sn sus, espri kapanisi soyle.
+            // UZUN MESAJ: 20+ kelime ise sadece ilk 15 kelime 1.5x hizda okunur, gerisi atlanir.
             if (kelimeSay(temiz) > MAKS_KELIME) {
                 String bas = ilkKelimeler(temiz, OZET_KELIME);
-                String kapanis = Kapanis.rastgele();
-                Gunluk.yaz(this, "  -> SESLENDIR UZUN (" + kim + ", 1.5x): " + bas + " | " + kapanis);
-                konusmaci.seslendir(bas, ses, 50, 1000); // +50% = 1.5x, sonra 1 sn bekle
-                konusmaci.seslendir(kapanis, ses);
+                Gunluk.yaz(this, "  -> SESLENDIR UZUN (" + kim + ", 1.5x): " + bas);
+                konusmaci.seslendir(bas, ses, 50, 0); // +50% = 1.5x
                 return;
             }
 
