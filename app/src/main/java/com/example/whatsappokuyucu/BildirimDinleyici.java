@@ -24,6 +24,10 @@ public class BildirimDinleyici extends NotificationListenerService {
     private static final int MAKS_KELIME = 20;    // bunun ustu "uzun mesaj" sayilir
     private static final int OZET_KELIME = 15;    // uzun mesajda hizlica okunacak kelime sayisi
     private static final int SESSIZ_SINIR = 30;   // bunun ustu HIC okunmaz (sessizce atlanir)
+    // BAYAT MESAJ: bildirim zamani su andan bu kadar eskiyse okunmaz. Telefon cevrimdisi/uyku
+    // sonrasi WhatsApp dun aksamdan kalan bildirimleri simdi gonderiyor; onlari okumayiz.
+    // 30 dk: sebekenin cekmedigi yerde gec gelen mesaj yine okunsun, ama gece kalani okunmasin.
+    private static final long BAYAT_ESIK_MS = 30 * 60_000L;
 
     // WhatsApp ozet bildirimleri ("3 yeni mesaj", "2 sohbet" vb.) — okunmaz
     private static final Pattern OZET = Pattern.compile(
@@ -55,6 +59,16 @@ public class BildirimDinleyici extends NotificationListenerService {
 
         Notification n = sbn.getNotification();
         if (n == null) return;
+        // BAYAT MESAJ KAPISI: bildirim zamani cok eskiyse (dun aksamdan kalan, cevrimdisi birikmis)
+        // hic okunmaz. n.when mesaj zamanini tasir; yoksa postTime'a duseriz.
+        long mesajZamani = n.when > 0 ? n.when : sbn.getPostTime();
+        if (mesajZamani > 0) {
+            long yasMs = System.currentTimeMillis() - mesajZamani;
+            if (yasMs > BAYAT_ESIK_MS) {
+                Gunluk.yaz(this, "  ATLA: bayat mesaj (" + (yasMs / 60_000L) + " dk once)");
+                return;
+            }
+        }
         // Grup ozeti bildirimi son mesajin metnini tekrar tasir → cift okumayi onlemek icin atla
         if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) { Gunluk.yaz(this, "  ATLA: grup ozeti"); return; }
         Bundle ex = n.extras;
