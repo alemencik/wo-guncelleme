@@ -21,13 +21,15 @@ public class BildirimDinleyici extends NotificationListenerService {
 
     private static final String WHATSAPP = "com.whatsapp";
     private static final String NTFY = "io.heckel.ntfy";
-    private static final int MAKS_KELIME = 20;    // bunun ustu "uzun mesaj" sayilir
-    private static final int OZET_KELIME = 15;    // uzun mesajda hizlica okunacak kelime sayisi
-    private static final int SESSIZ_SINIR = 30;   // bunun ustu HIC okunmaz (sessizce atlanir)
+    private static final int SESSIZ_SINIR = 25;   // 25 kelimeden UZUN mesaj HIC okunmaz; kisa mesaj normal hizda
     // BAYAT MESAJ: bildirim zamani su andan bu kadar eskiyse okunmaz. Telefon cevrimdisi/uyku
     // sonrasi WhatsApp dun aksamdan kalan bildirimleri simdi gonderiyor; onlari okumayiz.
     // 30 dk: sebekenin cekmedigi yerde gec gelen mesaj yine okunsun, ama gece kalani okunmasin.
     private static final long BAYAT_ESIK_MS = 30 * 60_000L;
+    // BIRIKMIS (backlog) mesaj: yasi bundan buyuk ama 30 dk'dan kucuk olanlar "geriden geldi"
+    // sayilir ve 1.5x HIZDA okunur (kuyrugu hizli bosaltmak icin). Canli mesaj normal hizda.
+    private static final long HIZLI_ESIK_MS = 60_000L;
+    private static final int HIZLI_YUZDE = 50;    // +%50 = 1.5x
 
     // WhatsApp ozet bildirimleri ("3 yeni mesaj", "2 sohbet" vb.) — okunmaz
     private static final Pattern OZET = Pattern.compile(
@@ -61,14 +63,18 @@ public class BildirimDinleyici extends NotificationListenerService {
         if (n == null) return;
         // BAYAT MESAJ KAPISI: bildirim zamani cok eskiyse (dun aksamdan kalan, cevrimdisi birikmis)
         // hic okunmaz. n.when mesaj zamanini tasir; yoksa postTime'a duseriz.
+        // Ayrica: 1 dk'dan eski ama 30 dk icindeki mesaj "geriden geldi" -> 1.5x hizda okunur.
         long mesajZamani = n.when > 0 ? n.when : sbn.getPostTime();
+        boolean hizliOku = false;
         if (mesajZamani > 0) {
             long yasMs = System.currentTimeMillis() - mesajZamani;
             if (yasMs > BAYAT_ESIK_MS) {
                 Gunluk.yaz(this, "  ATLA: bayat mesaj (" + (yasMs / 60_000L) + " dk once)");
                 return;
             }
+            hizliOku = yasMs > HIZLI_ESIK_MS; // birikmis: hizli oku
         }
+        final int okumaHizi = hizliOku ? HIZLI_YUZDE : 0;
         // Grup ozeti bildirimi son mesajin metnini tekrar tasir → cift okumayi onlemek icin atla
         if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) { Gunluk.yaz(this, "  ATLA: grup ozeti"); return; }
         Bundle ex = n.extras;
@@ -122,25 +128,18 @@ public class BildirimDinleyici extends NotificationListenerService {
             String ses = sesSec(title, text);
             String kim = Konusmaci.SES_KADIN.equals(ses) ? "Emel" : "Ahmet";
 
-            // 30 kelimeden uzun mesaj SESSIZCE atlanir (hic okunmaz)
+            // 25 kelimeden UZUN mesaj SESSIZCE atlanir (hic okunmaz). Kisa mesaj tam okunur.
             int adet = kelimeSay(temiz);
-            if (adet > SESSIZ_SINIR) { Gunluk.yaz(this, "  ATLA: " + adet + " kelime (30 ustu)"); return; }
+            if (adet > SESSIZ_SINIR) { Gunluk.yaz(this, "  ATLA: " + adet + " kelime (25 ustu)"); return; }
 
-            // 21-30 kelime: sadece ilk 15 kelime 1.5x hizda okunur, gerisi atlanir.
-            if (adet > MAKS_KELIME) {
-                String bas = ilkKelimeler(temiz, OZET_KELIME);
-                Gunluk.yaz(this, "  -> SESLENDIR UZUN (" + kim + ", 1.5x): " + bas);
-                konusmaci.seslendir(bas, ses, 50, 0); // +50% = 1.5x
-                return;
-            }
-
-            Gunluk.yaz(this, "  -> SESLENDIR (" + kim + "): " + temiz);
-            konusmaci.seslendir(temiz, ses);
+            // Hiz: birikmis (geriden gelen) mesaj 1.5x, canli mesaj normal.
+            Gunluk.yaz(this, "  -> SESLENDIR (" + kim + (okumaHizi != 0 ? ", 1.5x" : "") + "): " + temiz);
+            konusmaci.seslendir(temiz, ses, okumaHizi, 0);
         } else { // ntfy → Ahmet (dogal erkek), SADECE mesaj metni (baslik/uygulama adi okunmaz)
             String temiz = temizle(text);
             if (TextUtils.isEmpty(temiz)) return;
-            Gunluk.yaz(this, "  -> SESLENDIR (Ahmet): " + temiz);
-            konusmaci.seslendir(temiz, Konusmaci.SES_ERKEK);
+            Gunluk.yaz(this, "  -> SESLENDIR (Ahmet" + (okumaHizi != 0 ? ", 1.5x" : "") + "): " + temiz);
+            konusmaci.seslendir(temiz, Konusmaci.SES_ERKEK, okumaHizi, 0);
         }
     }
 
@@ -163,16 +162,6 @@ public class BildirimDinleyici extends NotificationListenerService {
     private static int kelimeSay(String s) {
         if (s == null || s.trim().isEmpty()) return 0;
         return s.trim().split("\\s+").length;
-    }
-
-    /** Metnin ilk n kelimesi. */
-    private static String ilkKelimeler(String s, int n) {
-        if (s == null) return "";
-        String[] p = s.trim().split("\\s+");
-        if (p.length <= n) return s.trim();
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < n; i++) { if (i > 0) sb.append(' '); sb.append(p[i]); }
-        return sb.toString();
     }
 
     // URL'leri ve emoji/sembolleri at, kisaltmalari duzelt, bosluklari sadeles. (TTS daha dogal okur)
