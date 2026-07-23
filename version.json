@@ -1,6 +1,6 @@
 {
-  "versionCode": 21,
-  "versionName": "21.0",
+  "versionCode": 22,
+  "versionName": "22.0",
   "url": "https://raw.githubusercontent.com/alemencik/wo-guncelleme/main/whatsappokuyucu.apk",
   "not": "v20: 30 kelimeden uzun mesajlar HIC okunmaz. 21-30 kelime: ilk 15 kelime 1.5x. 20 ve alti: tam okunur."
 }
