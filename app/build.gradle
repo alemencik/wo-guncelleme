@@ -10,8 +10,8 @@ android {
         applicationId "com.example.whatsappokuyucu"
         minSdk 24
         targetSdk 34
-        versionCode 20
-        versionName "20.0"
+        versionCode 21
+        versionName "21.0"
     }
 
     // İmzalama: CI'da imza anahtarı ortam değişkenlerinden gelir (release).

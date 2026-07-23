@@ -8,6 +8,8 @@ import android.speech.tts.TextToSpeech;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -33,6 +35,12 @@ public class Konusmaci {
     private final Context ctx;
     private final EdgeTts edge;
     private final LinkedBlockingQueue<Oge> kuyruk = new LinkedBlockingQueue<>();
+    // BIRIKMIS MESAJ (backlog) siniri: bir "sel" halinde gelen mesajlarin yalniz son
+    // BACKLOG_SON tanesi okunur. Telefon cevrimdisi kaldiktan/uyandiktan sonra WhatsApp
+    // onlarca eski bildirimi arka arkaya gonderir; hepsini okumak yerine son 3'u okuruz.
+    private static final int BACKLOG_SON = 3;
+    // Ard arda gelen mesajlar bu sure boyunca sessizlik olana dek "ayni sel" sayilir.
+    private static final long SEL_PENCERE_MS = 1200L;
     private TextToSpeech yedekTts;
     private volatile boolean yedekHazir = false;
     private Thread isci;
@@ -68,23 +76,42 @@ public class Konusmaci {
     private void dongu() {
         while (true) {
             try {
-                Oge oge = kuyruk.take();
-                gorusmeBiteneKadarBekle();
-                Gunluk.yaz(ctx, "  KUYRUK al, Edge cagriliyor: " + oge.ses
-                        + (oge.hiz != 0 ? " (hiz +" + oge.hiz + "%)" : ""));
-                byte[] mp3 = edge.synthesize(oge.metin, oge.ses, oge.hiz);
-                if (mp3 == null) { // anlik hata olabilir: kisa bekle, bir kez daha dene (Google'a dusmeden once)
-                    Gunluk.yaz(ctx, "  Edge NULL -> 1.5sn sonra TEKRAR dene");
-                    try { Thread.sleep(1500); } catch (InterruptedException ie) { return; }
-                    mp3 = edge.synthesize(oge.metin, oge.ses, oge.hiz);
+                // Ilk mesaji bekle, sonra kisa sessizlik olana dek gelen tum mesajlari topla.
+                // Boylece bir "sel" (backlog) tek seferde gorulur ve son 3'e kirpilabilir.
+                List<Oge> sel = new ArrayList<>();
+                sel.add(kuyruk.take());
+                Oge sonraki;
+                while ((sonraki = kuyruk.poll(SEL_PENCERE_MS, TimeUnit.MILLISECONDS)) != null) {
+                    sel.add(sonraki);
                 }
-                if (mp3 != null) { Gunluk.yaz(ctx, "  Edge OK (" + mp3.length + " bayt), cal"); cal(mp3); }
-                else { Gunluk.yaz(ctx, "  Edge yine NULL -> Google yedek"); yedekSeslendir(oge.metin); }
-                if (oge.bekleMs > 0) Thread.sleep(oge.bekleMs);
+                // Birikmis mesaj: yalniz son BACKLOG_SON tanesini oku, oncekileri sessizce at.
+                if (sel.size() > BACKLOG_SON) {
+                    int atilan = sel.size() - BACKLOG_SON;
+                    Gunluk.yaz(ctx, "  BACKLOG: " + sel.size() + " mesaj birikti -> ilk "
+                            + atilan + " atlandi, son " + BACKLOG_SON + " okunuyor");
+                    sel = sel.subList(sel.size() - BACKLOG_SON, sel.size());
+                }
+                for (Oge oge : sel) seslendirOge(oge);
             } catch (InterruptedException e) {
                 return;
             } catch (Exception ignore) { }
         }
+    }
+
+    /** Tek bir kuyruk ogesini seslendirir (gorusme bitince, Edge -> Google yedek). */
+    private void seslendirOge(Oge oge) throws InterruptedException {
+        gorusmeBiteneKadarBekle();
+        Gunluk.yaz(ctx, "  KUYRUK al, Edge cagriliyor: " + oge.ses
+                + (oge.hiz != 0 ? " (hiz +" + oge.hiz + "%)" : ""));
+        byte[] mp3 = edge.synthesize(oge.metin, oge.ses, oge.hiz);
+        if (mp3 == null) { // anlik hata olabilir: kisa bekle, bir kez daha dene (Google'a dusmeden once)
+            Gunluk.yaz(ctx, "  Edge NULL -> 1.5sn sonra TEKRAR dene");
+            Thread.sleep(1500);
+            mp3 = edge.synthesize(oge.metin, oge.ses, oge.hiz);
+        }
+        if (mp3 != null) { Gunluk.yaz(ctx, "  Edge OK (" + mp3.length + " bayt), cal"); cal(mp3); }
+        else { Gunluk.yaz(ctx, "  Edge yine NULL -> Google yedek"); yedekSeslendir(oge.metin); }
+        if (oge.bekleMs > 0) Thread.sleep(oge.bekleMs);
     }
 
     /**
